@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hybrid Search RAG — Architecture Guide</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --bg-card: #ffffff;
+    --text: #1f2328;
+    --text-muted: #57606a;
+    --border: #d8dee4;
+    --accent: #a2742b;
+    --accent-bg: #fbeee0;
+    --code-bg: #f4f2ee;
+    --dense: #2f6f5e;
+    --sparse: #9c4221;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181c;
+      --bg-card: #1c2126;
+      --text: #e6edf3;
+      --text-muted: #9aa7b2;
+      --border: #30363d;
+      --accent: #e3b567;
+      --accent-bg: #2b2317;
+      --code-bg: #22272c;
+      --dense: #5fd3b3;
+      --sparse: #f0a06a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+  header { margin-bottom: 2.5rem; }
+  header p.eyebrow {
+    color: var(--accent);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    margin: 0 0 0.5rem;
+  }
+  h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.4rem; margin-top: 3rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; }
+  h3 { font-size: 1.1rem; margin-top: 2rem; }
+  p.lead { color: var(--text-muted); font-size: 1.05rem; max-width: 60ch; }
+  a { color: var(--accent); }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+  }
+  .mermaid { background: transparent; }
+  code, pre {
+    background: var(--code-bg);
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88rem;
+  }
+  code { padding: 0.15em 0.4em; }
+  pre { padding: 1rem; overflow-x: auto; }
+  pre code { padding: 0; background: none; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-muted); font-weight: 600; }
+  .pill-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 1rem 0; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: var(--accent-bg); color: var(--accent);
+    border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.85rem; font-weight: 600;
+  }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+  .col-dense, .col-sparse {
+    border-radius: 10px; padding: 1rem; border: 1px solid var(--border);
+  }
+  .col-dense { border-left: 4px solid var(--dense); }
+  .col-sparse { border-left: 4px solid var(--sparse); }
+  .col-dense h4 { color: var(--dense); margin: 0 0 0.4rem; }
+  .col-sparse h4 { color: var(--sparse); margin: 0 0 0.4rem; }
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.9rem; }
+  .callout {
+    background: var(--accent-bg); border-radius: 10px; padding: 1rem 1.2rem; margin: 1.2rem 0;
+    border: 1px solid var(--border);
+  }
+  .callout strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">hybrid-search-rag · architecture guide</p>
+    <h1>Hybrid Search RAG: How It Works</h1>
+    <p class="lead">
+      A visual walkthrough of the recipe recommender in this repository. If you'd rather run
+      code than read diagrams, jump straight to the
+      <a href="../RAG_%2B_Hybrid_Search_with_Crew_AI%2C_NeonDb%2C_Qdrant_and_Gemini_a_real_world_scenario.ipynb">notebook</a>
+      or the <a href="../README.md">README</a>.
+    </p>
+  </header>
+
+  <section>
+    <h2>1. The problem: keyword search vs. meaning search</h2>
+    <p>Say a user searches for <em>"warm soup for a cold day"</em>. Two very different search
+      techniques can answer this, and each one is good at something the other is bad at.</p>
+
+    <div class="two-col">
+      <div class="col-dense">
+        <h4>Dense / semantic search</h4>
+        <p>Turns text into a vector (a long list of numbers) that captures <em>meaning</em>.
+        "Warm soup" and "Pumpkin Bisque" end up as similar vectors, even though they share no
+        words. Great at understanding intent — but can occasionally drift away from an exact
+        word the user cares about.</p>
+      </div>
+      <div class="col-sparse">
+        <h4>Sparse / keyword search</h4>
+        <p>Classic full-text search (this project uses TF-IDF). Matches exact words. Very
+        precise for specific ingredient or dish names — but has zero understanding of
+        meaning, so it misses synonyms and paraphrases entirely.</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Hybrid search</strong> runs both searches at once and merges the two ranked
+      lists using <strong>Reciprocal Rank Fusion (RRF)</strong> — a simple, well-tested
+      algorithm that rewards results appearing near the top of <em>either</em> list. Qdrant
+      does this fusion natively in a single query.
+    </div>
+  </section>
+
+  <section>
+    <h2>2. Architecture at a glance</h2>
+    <div class="card">
+      <pre class="mermaid">
+flowchart TD
+    subgraph Ingest["Indexing (offline, once)"]
+        R["Recipe text<br/>(name, description, cuisine, season)"]
+        R --> PG[("PostgreSQL / Neon<br/>recipe metadata")]
+        R --> EMB["Gemini embedding model<br/>(gemini-embedding-001)"]
+        R --> TFIDF["TF-IDF vectorizer"]
+        EMB --> QD[("Qdrant<br/>semantic-vector + keyword-vector")]
+        TFIDF --> QD
+    end
+
+    subgraph Query["Query (every search)"]
+        U["User query"] --> EMB2["Embed query<br/>(same Gemini model)"]
+        U --> TFIDF2["Vectorize query<br/>(same TF-IDF fit)"]
+        EMB2 --> RRF{"Qdrant Prefetch + RRF fusion"}
+        TFIDF2 --> RRF
+        QD -.indexed data.-> RRF
+        RRF --> TOP["Top-k fused results"]
+        TOP --> AGENT["CrewAI 'Recipe Expert' agent<br/>(Gemini LLM)"]
+        AGENT --> OUT["Friendly recommendation"]
+    end
+      </pre>
+    </div>
+    <p>The same Qdrant collection stores both vector types <em>per recipe</em> — a
+      <code>semantic-vector</code> (dense, 3072 numbers from Gemini) and a
+      <code>keyword-vector</code> (sparse, from TF-IDF). One query, one round trip, one fused
+      answer.</p>
+  </section>
+
+  <section>
+    <h2>3. What happens on a single search, step by step</h2>
+    <div class="card">
+      <pre class="mermaid">
+sequenceDiagram
+    actor User
+    participant Tool as RecipeSearchTool
+    participant Gemini as Gemini Embeddings
+    participant TFIDF as TF-IDF Vectorizer
+    participant Qdrant
+    participant Agent as CrewAI Agent (Gemini LLM)
+
+    User->>Agent: "best thai recipe for winter"
+    Agent->>Tool: call hybrid_search(query)
+    Tool->>Gemini: embed_query(query)
+    Gemini-->>Tool: dense vector (3072 dims)
+    Tool->>TFIDF: transform(query)
+    TFIDF-->>Tool: sparse vector
+    Tool->>Qdrant: query_points(prefetch=[dense, sparse], fusion=RRF)
+    Qdrant-->>Tool: top-k fused recipe matches
+    Tool-->>Agent: formatted recipe list
+    Agent-->>User: friendly recommendation
+      </pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>4. Two ways to run it</h2>
+    <table>
+      <thead>
+        <tr><th></th><th><code>TEST_MODE = True</code> (default)</th><th><code>TEST_MODE = False</code></th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Vector DB</td><td>In-memory Qdrant, nothing to install</td><td>Your Qdrant Cloud cluster</td></tr>
+        <tr><td>Recipe storage</td><td>Python list in memory</td><td>Your Neon/PostgreSQL database</td></tr>
+        <tr><td>Embeddings</td><td>Deterministic fake vectors, no API key, no cost</td><td>Real Gemini embeddings</td></tr>
+        <tr><td>Final answer</td><td>Raw hybrid search results + self-test asserts</td><td>CrewAI agent writes a friendly recommendation</td></tr>
+        <tr><td>Good for</td><td>Learning the code, CI checks, offline demos</td><td>The real product experience</td></tr>
+      </tbody>
+    </table>
+    <p>This means anyone who clones the repo can run the whole notebook and see it work in a
+      few seconds, before ever creating a cloud account.</p>
+  </section>
+
+  <section>
+    <h2>5. Scaling the dataset</h2>
+    <p>The notebook includes an opt-in cell that uses <a href="https://faker.readthedocs.io/">Faker</a>
+      to generate a mock dataset of any size, so you can see how indexing time and search
+      latency change as the collection grows — all the way up to 1,000,000 recipes.</p>
+    <div class="pill-row">
+      <span class="pill">5 recipes → instant</span>
+      <span class="pill">20,000 recipes → ~45s indexing</span>
+      <span class="pill">1,000,000 recipes → ~35–40 min, Qdrant Cloud recommended</span>
+    </div>
+    <p>Qdrant's own in-memory mode prints a warning past ~20,000 points — for a genuine
+      1,000,000-recipe benchmark, point the notebook at a real Qdrant Cloud cluster or a local
+      Qdrant Docker container instead of <code>:memory:</code> mode.</p>
+  </section>
+
+  <section>
+    <h2>6. Tech stack</h2>
+    <table>
+      <tbody>
+        <tr><td><strong>CrewAI</strong></td><td>Orchestrates the AI agent that decides when to search and writes the final answer.</td></tr>
+        <tr><td><strong>Qdrant</strong></td><td>Vector database; stores dense + sparse vectors per recipe and performs the RRF hybrid query.</td></tr>
+        <tr><td><strong>Neon (PostgreSQL)</strong></td><td>Stores recipe metadata (name, description, cuisine, season).</td></tr>
+        <tr><td><strong>langchain-google-genai</strong></td><td>Client for Gemini's <code>gemini-embedding-001</code> embedding model.</td></tr>
+        <tr><td><strong>scikit-learn</strong></td><td><code>TfidfVectorizer</code> for the keyword/sparse side of the search.</td></tr>
+        <tr><td><strong>Faker</strong></td><td>Generates mock recipes for scale testing (up to 1,000,000).</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    Part of the <a href="https://github.com/exponen-agi/hybrid-search-rag">hybrid-search-rag</a> repository ·
+    <a href="../LICENSE">MIT License</a>
+  </footer>
+
+</div>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default',
+    securityLevel: 'strict'
+  });
+</script>
+</body>
+</html>

@@ -1,62 +1,168 @@
-# Recipe Recommender using CrewAI, Qdrant, and Neon
+# Hybrid Search RAG: Recipe Recommender
 
-This notebook demonstrates how to build a simple recipe recommendation system using a combination of technologies:
+A small, easy-to-read example that shows how to combine **two kinds of search** into one
+better search, then use an AI agent to turn the results into a friendly answer.
 
-- **CrewAI:** For orchestrating the agent and task.
-- **Qdrant:** As a vector database for storing and searching recipe embeddings.
-- **Neon:** As a serverless PostgreSQL database to store recipe metadata.
-- **Langchain-Google-GenAI:** To generate embeddings using Google's models.
-- **Psycopg2-binary:** Python adapter for PostgreSQL.
-- **Qdrant-client:** Python client for Qdrant.
-- **Crewai-tools:** Provides tools for CrewAI agents.
-- **Scikit-learn:** Used for TF-IDF vectorization.
+This is written for developers who are new to AI / RAG concepts. No prior experience with
+embeddings, vector databases, or AI agents is assumed.
 
-The system allows you to search for recipes based on natural language queries, leveraging both semantic search (using embeddings) and keyword search (using TF-IDF) for improved relevance.
+📖 **Want pictures instead of text?** See the visual walkthrough at
+[**docs/index.html**](docs/index.html) (open it in any browser, or view it on
+[GitHub Pages](https://exponen-agi.github.io/hybrid-search-rag/) once Pages is enabled for this repo).
 
-## Prerequisites
+## What is "hybrid search"?
 
-To run this notebook, you will need:
+Imagine you search for `"warm soup for a cold day"` in a recipe app.
 
-*   A Google Cloud Project with the Gemini API enabled.
-*   A Neon account and a PostgreSQL database instance.
-*   A Qdrant Cloud account and a free cluster.
-*   Python 3.7 or higher.
+- **Keyword search** only finds recipes that literally contain words like "warm", "soup",
+  "cold", "day". It would miss a great recipe called *"Pumpkin Bisque"* even though that's
+  exactly what you want, because the words don't match.
+- **Semantic search** (AI embeddings) understands *meaning*, so it would find "Pumpkin
+  Bisque" too. But it can sometimes miss an exact, important keyword a user typed on purpose
+  (like an ingredient name).
 
-## Setup
+**Hybrid search does both at once** and combines the two result lists using a technique
+called **Reciprocal Rank Fusion (RRF)**, so you get the best of each approach.
 
-1.  **Clone the Repository:**
-    ```bash
-    git clone <repository_url>
-    cd <repository_directory>
-    ```
+```mermaid
+flowchart TD
+    Q["User query:<br/>'warm soup for a cold day'"]
+    Q --> D["Dense search (meaning)<br/>Gemini embedding + Qdrant"]
+    Q --> S["Sparse search (keywords)<br/>TF-IDF + Qdrant"]
+    D --> F["Qdrant fuses both lists<br/>(Reciprocal Rank Fusion)"]
+    S --> F
+    F --> A["CrewAI 'Recipe Expert' agent<br/>(Gemini LLM)"]
+    A --> R["Friendly recommendation"]
+```
 
-2.  **Install Dependencies:**
-    Run the first few cells of the notebook to install the required Python packages:
-    ```bash
-    !pip install psycopg2-binary qdrant-client crewai crewai-tools langchain-google-genai -U qdrant-client
-    ```
+If diagrams don't render for you, here is the same flow in plain text:
 
-3.  **Set up Environment Variables:**
-    You will need to provide your credentials for the databases and the Gemini API. You can either set these as environment variables before running the notebook or directly within the notebook itself (though using environment variables is recommended for security).
+```
+                    ┌───────────────────────┐
+                    │      Your query        │
+                    │ "warm soup for winter" │
+                    └───────────┬─────────────┘
+                                │
+                 ┌──────────────┴───────────────┐
+                 ▼                               ▼
+      ┌─────────────────────┐        ┌─────────────────────┐
+      │ Dense (semantic)     │        │ Sparse (keyword)     │
+      │ Gemini embedding     │        │ TF-IDF vector        │
+      └──────────┬───────────┘        └──────────┬───────────┘
+                 │                                │
+                 ▼                                ▼
+         ┌───────────────────────────────────────────────┐
+         │              Qdrant hybrid query                │
+         │         (Reciprocal Rank Fusion / RRF)           │
+         └───────────────────────┬───────────────────────┘
+                                 ▼
+                     ┌───────────────────────┐
+                     │  CrewAI "Recipe Expert" │
+                     │  agent (Gemini LLM)      │
+                     └───────────┬─────────────┘
+                                 ▼
+                    Friendly recipe recommendation
+```
 
-    *   `GEMINI_API_KEY`: Your API key for the Google Gemini API.
-    *   `DB_HOST`: Your Neon PostgreSQL host.
-    *   `DB_NAME`: Your Neon PostgreSQL database name.
-    *   `DB_USER`: Your Neon PostgreSQL database user.
-    *   `DB_PASSWORD`: Your Neon PostgreSQL database password.
-    *   `QDRANT_URL`: Your Qdrant Cloud cluster URL.
-    *   `QDRANT_API_KEY`: Your Qdrant Cloud API key.
+## What's in this repo
 
-4.  **Run the Notebook:**
-    Execute the cells in the notebook sequentially. The `setup_database_and_qdrant()` function will create the necessary tables in your Neon database, insert sample data, and index this data in your Qdrant collection.
+| File | What it is |
+|---|---|
+| [`RAG_+_Hybrid_Search_with_Crew_AI,_NeonDb,_Qdrant_and_Gemini_a_real_world_scenario.ipynb`](<RAG_+_Hybrid_Search_with_Crew_AI,_NeonDb,_Qdrant_and_Gemini_a_real_world_scenario.ipynb>) | The full, runnable example notebook |
+| [`requirements.txt`](requirements.txt) | Exact, pinned package versions the notebook was tested with |
+| [`docs/index.html`](docs/index.html) | A visual, diagram-heavy explanation of the architecture |
+| [`LICENSE`](LICENSE) | MIT License |
 
-## How it Works
+## The tools this project uses
 
-1.  **Data Loading and Indexing:** The `setup_database_and_qdrant()` function connects to your Neon database, creates a `recipes` table, inserts sample data, and then indexes this data in Qdrant. Each recipe is indexed using both a dense vector (generated by the Gemini embedding model) for semantic similarity and a sparse vector (generated by TF-IDF) for keyword matching.
-2.  **Recipe Search Tool:** The `RecipeSearchTool` is a custom tool for the CrewAI agent. When called with a user query, it performs a hybrid search in Qdrant, combining the results from both the dense and sparse vector searches using RRF (Reciprocal Rank Fusion) to get the best results.
-3.  **CrewAI Agent and Task:** A `Recipe Expert` agent is defined with the `RecipeSearchTool`. A task is assigned to this agent to find a recipe based on the user's query.
-4.  **Crew Execution:** The CrewAI `Crew` is created with the agent and task. The `kickoff` method starts the process, the agent uses the `RecipeSearchTool` to search Qdrant, and then generates a friendly response recommending the found recipe(s).
+- **[CrewAI](https://docs.crewai.com/):** Runs an AI "agent" that decides when to search and how to phrase the final answer.
+- **[Qdrant](https://qdrant.tech/):** A vector database. Stores both the semantic (dense) and keyword (sparse) vectors for each recipe, and does the hybrid RRF search.
+- **[Neon](https://neon.tech/):** A free, serverless PostgreSQL database, used to store the recipe text/metadata itself (name, description, cuisine, season).
+- **[langchain-google-genai](https://pypi.org/project/langchain-google-genai/):** Talks to Google's Gemini API to turn recipe text into semantic embeddings.
+- **[scikit-learn](https://scikit-learn.org/):** Provides `TfidfVectorizer`, the classic algorithm used for keyword-based search.
+- **[Faker](https://faker.readthedocs.io/):** Generates realistic-looking mock recipes, so you can test the pipeline with anywhere from 5 to 1,000,000 recipes without needing a real dataset.
 
-## Usage
+## Quick start — no accounts, no API keys needed
 
-After running the setup cells, the notebook will prompt you to enter a recipe query:
+You can run the whole pipeline end-to-end in a few seconds, entirely offline, to see exactly
+how the code works before you sign up for anything:
+
+1. Open the notebook (in [Google Colab](https://colab.research.google.com/github/exponen-agi/hybrid-search-rag/blob/main/RAG_%2B_Hybrid_Search_with_Crew_AI%2C_NeonDb%2C_Qdrant_and_Gemini_a_real_world_scenario.ipynb), Jupyter, or VS Code).
+2. Leave `TEST_MODE = True` (this is the default in the config cell).
+3. Run all cells top to bottom.
+
+In this mode the notebook:
+- Uses an in-memory Qdrant database (no cloud account needed).
+- Stores recipes in a plain Python list (no Postgres needed).
+- Uses small, deterministic "fake" embeddings instead of calling the Gemini API (no API key, no cost).
+- Runs a self-test with real `assert` checks, so you immediately see whether hybrid search is working.
+
+This is the fastest way to confirm the code runs correctly on your machine, and it's exactly
+what an automated test/CI run would use too.
+
+## Full experience — with real AI and real cloud databases
+
+Once you're ready to see real, meaningful recommendations (not just fake-vector plumbing
+checks), switch to the live pipeline:
+
+### 1. Get your credentials
+- A [Google AI Studio](https://aistudio.google.com/app/apikey) API key for Gemini (`GEMINI_API_KEY`).
+- A free [Neon](https://neon.tech) PostgreSQL database — you'll need the host, database name, username, and password.
+- A free [Qdrant Cloud](https://cloud.qdrant.io) cluster — you'll need the cluster URL and API key.
+
+### 2. Set your environment variables
+```bash
+export GEMINI_API_KEY="your-gemini-api-key"
+export DB_HOST="your-neon-host"
+export DB_NAME="your-database-name"
+export DB_USER="your-database-user"
+export DB_PASSWORD="your-database-password"
+export QDRANT_URL="your-qdrant-cluster-url"
+export QDRANT_API_KEY="your-qdrant-api-key"
+```
+(In Colab, you can instead paste these into the notebook's config cell directly, or use
+Colab's "Secrets" panel.)
+
+### 3. Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Run the notebook
+Open the config cell and change:
+```python
+TEST_MODE = False
+```
+Then run all cells. The notebook will:
+1. Create the `recipes` table in your Neon database and insert sample data.
+2. Create a Qdrant collection with a dense ("semantic-vector") and sparse ("keyword-vector") index.
+3. Embed every recipe with Gemini and index it into Qdrant.
+4. Ask you what kind of recipe you're looking for.
+5. Use hybrid search + a CrewAI agent to recommend a recipe in plain, friendly language.
+
+## Testing at scale (up to 1,000,000 recipes)
+
+The notebook includes an optional cell that uses [Faker](https://faker.readthedocs.io/) to
+generate a mock dataset of any size — including a full 1,000,000-recipe test — so you can see
+how hybrid search behaves as the dataset grows, without needing a real large dataset or
+spending money on embedding API calls. It's off by default; see the notebook's
+"Optional: scale test" section for how to turn it on and what to expect (roughly 35–40
+minutes and a few GB of RAM for the full 1,000,000-recipe run).
+
+We didn't bundle a real public dataset (like [RecipeNLG](https://recipenlg.cs.put.poznan.pl/)
+or the [Food.com Recipes and Interactions](https://www.kaggle.com/datasets/shuyangli94/food-com-recipes-and-user-interactions)
+dataset on Kaggle) because they're several gigabytes and carry their own license terms — but
+they're worth trying manually if you want to test with real-world recipe text instead of
+mock data.
+
+## How the code is organized
+
+1. **Configuration** — one `TEST_MODE` flag switches between the offline demo and the real pipeline.
+2. **Embeddings** — `get_embedding_model()` returns either a real Gemini embedding client or a fast, deterministic fake one.
+3. **Storage** — `setup_database_and_qdrant()` stores recipe text (Postgres or an in-memory list) and indexes dense + sparse vectors into Qdrant.
+4. **Hybrid search** — `hybrid_search()` is the core function: it embeds the query two ways, then asks Qdrant to fuse the results with RRF.
+5. **CrewAI agent** — `build_recipe_crew()` wires up a single agent whose only tool is `hybrid_search()`, so it always answers based on real search results.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
