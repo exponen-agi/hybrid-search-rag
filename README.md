@@ -78,7 +78,7 @@ If diagrams don't render for you, here is the same flow in plain text:
 - **[CrewAI](https://docs.crewai.com/):** Runs an AI "agent" that decides when to search and how to phrase the final answer.
 - **[Qdrant](https://qdrant.tech/):** A vector database. Stores both the semantic (dense) and keyword (sparse) vectors for each recipe, and does the hybrid RRF search.
 - **[Neon](https://neon.tech/):** A free, serverless PostgreSQL database, used to store the recipe text/metadata itself (name, description, cuisine, season).
-- **[langchain-google-genai](https://pypi.org/project/langchain-google-genai/):** Talks to Google's Gemini API to turn recipe text into semantic embeddings.
+- **[langchain-google-genai](https://pypi.org/project/langchain-google-genai/):** Talks to Google's Gemini API to turn recipe text into semantic embeddings (using the `gemini-embedding-2` model — see note below).
 - **[scikit-learn](https://scikit-learn.org/):** Provides `TfidfVectorizer`, the classic algorithm used for keyword-based search.
 - **[Faker](https://faker.readthedocs.io/):** Generates realistic-looking mock recipes, so you can test the pipeline with anywhere from 5 to 1,000,000 recipes without needing a real dataset.
 
@@ -162,6 +162,29 @@ mock data.
 3. **Storage** — `setup_database_and_qdrant()` stores recipe text (Postgres or an in-memory list) and indexes dense + sparse vectors into Qdrant.
 4. **Hybrid search** — `hybrid_search()` is the core function: it embeds the query two ways, then asks Qdrant to fuse the results with RRF.
 5. **CrewAI agent** — `build_recipe_crew()` wires up a single agent whose only tool is `hybrid_search()`, so it always answers based on real search results.
+
+## Recent dependency & methodology updates (checked 2026-08-27)
+
+This project is checked periodically against upstream release notes so it keeps working and
+keeps teaching current best practice, not outdated patterns. Latest pass:
+
+- **Switched the embedding model from `gemini-embedding-001` to `gemini-embedding-2`.**
+  Google has `gemini-embedding-001` scheduled for shutdown between July and October 2026, and
+  the LangChain Google team's own contributor guide already lists it as a model to avoid.
+  `gemini-embedding-2` is the generally-available successor — same default 3072-dimension
+  output, so nothing else in the pipeline (Qdrant collection config, `EMBEDDING_DIM`) needed
+  to change. If you're on an account that still has `gemini-embedding-001` access and prefer
+  it, it's a one-line swap back in the notebook's config cell.
+- **Bumped `langchain-google-genai` (4.3.4 → 4.3.6) and `faker` (40.36.0 → 40.37.0)** to their
+  latest published patch releases. `crewai`, `crewai-tools`, `qdrant-client`, `scikit-learn`,
+  and `psycopg2-binary` were already pinned to their current latest versions.
+- **Verified `qdrant-client==1.19.0` still matches this notebook's usage.** That release
+  removed several long-deprecated methods (`search`, `recommend`, `upload_records`,
+  `recreate_collection`, and others) — this notebook already used the modern
+  `collection_exists()` / `create_collection()` / `query_points()` calls, so no code changes
+  were required there.
+- **Confirmed `gemini/gemini-3.5-flash`** (the CrewAI agent's LLM) is still a current,
+  supported Gemini Flash model — no change needed.
 
 ## License
 

@@ -149,7 +149,7 @@ flowchart TD
     subgraph Ingest["Indexing (offline, once)"]
         R["Recipe text<br/>(name, description, cuisine, season)"]
         R --> PG[("PostgreSQL / Neon<br/>recipe metadata")]
-        R --> EMB["Gemini embedding model<br/>(gemini-embedding-001)"]
+        R --> EMB["Gemini embedding model<br/>(gemini-embedding-2)"]
         R --> TFIDF["TF-IDF vectorizer"]
         EMB --> QD[("Qdrant<br/>semantic-vector + keyword-vector")]
         TFIDF --> QD
@@ -239,11 +239,24 @@ sequenceDiagram
         <tr><td><strong>CrewAI</strong></td><td>Orchestrates the AI agent that decides when to search and writes the final answer.</td></tr>
         <tr><td><strong>Qdrant</strong></td><td>Vector database; stores dense + sparse vectors per recipe and performs the RRF hybrid query.</td></tr>
         <tr><td><strong>Neon (PostgreSQL)</strong></td><td>Stores recipe metadata (name, description, cuisine, season).</td></tr>
-        <tr><td><strong>langchain-google-genai</strong></td><td>Client for Gemini's <code>gemini-embedding-001</code> embedding model.</td></tr>
+        <tr><td><strong>langchain-google-genai</strong></td><td>Client for Gemini's <code>gemini-embedding-2</code> embedding model.</td></tr>
         <tr><td><strong>scikit-learn</strong></td><td><code>TfidfVectorizer</code> for the keyword/sparse side of the search.</td></tr>
         <tr><td><strong>Faker</strong></td><td>Generates mock recipes for scale testing (up to 1,000,000).</td></tr>
       </tbody>
     </table>
+  </section>
+
+  <section>
+    <h2>7. Kept up to date</h2>
+    <div class="callout">
+      <strong>Last dependency check: 2026-08-27.</strong> The embedding model was switched
+      from <code>gemini-embedding-001</code> to <code>gemini-embedding-2</code> because Google
+      has the older model scheduled for shutdown between July and October 2026. Both models
+      output 3072-dimension vectors by default, so no other part of this architecture
+      changed. See the README's
+      <a href="../README.md#recent-dependency--methodology-updates-checked-2026-08-27">"Recent
+      dependency &amp; methodology updates"</a> section for the full list of what was checked.
+    </div>
   </section>
 
   <footer>
