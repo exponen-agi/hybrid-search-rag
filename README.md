@@ -163,10 +163,31 @@ mock data.
 4. **Hybrid search** — `hybrid_search()` is the core function: it embeds the query two ways, then asks Qdrant to fuse the results with RRF.
 5. **CrewAI agent** — `build_recipe_crew()` wires up a single agent whose only tool is `hybrid_search()`, so it always answers based on real search results.
 
-## Recent dependency & methodology updates (checked 2026-08-27)
+## Recent dependency & methodology updates (checked 2026-09-03)
 
 This project is checked periodically against upstream release notes so it keeps working and
 keeps teaching current best practice, not outdated patterns. Latest pass:
+
+- **Bumped `crewai` and `crewai-tools` (1.15.17 → 1.15.18), `langchain-google-genai`
+  (4.3.6 → 4.4.0), and `faker` (40.37.0 → 40.38.0)** to their latest published releases.
+  All three are additive/bug-fix updates (no breaking changes for the `Agent`/`Task`/`Crew`/
+  `LLM`/`BaseTool` APIs or `GoogleGenerativeAIEmbeddings` used in this notebook), verified
+  directly against the PyPI release feeds. `qdrant-client`, `scikit-learn`, `psycopg2-binary`,
+  and `numpy` had no new releases since the previous pass, so they stay as-is.
+- **Re-confirmed `gemini-embedding-2`** is still Google's current, generally-available
+  embedding model at its default 3072-dimension output (matching `EMBEDDING_DIM` in the
+  notebook), and that the `gemini-embedding-001` shutdown is unchanged — no code changes
+  needed.
+- **Re-confirmed `gemini/gemini-3.5-flash`** (the CrewAI agent's LLM) is still current and
+  supported, with no newer Gemini Flash release available yet — no change needed.
+- **Noted for the curious:** Qdrant also supports a **DBSF** fusion method
+  (`models.Fusion.DBSF`, normalization-based) as an alternative to the **RRF**
+  (rank-based) fusion this notebook uses. RRF stays the better teaching default because it
+  needs no score-normalization assumptions, but DBSF is worth trying if you fork this
+  notebook and want to compare fusion strategies on your own data.
+
+<details>
+<summary>Previous pass (2026-08-27)</summary>
 
 - **Switched the embedding model from `gemini-embedding-001` to `gemini-embedding-2`.**
   Google has `gemini-embedding-001` scheduled for shutdown between July and October 2026, and
@@ -185,6 +206,8 @@ keeps teaching current best practice, not outdated patterns. Latest pass:
   were required there.
 - **Confirmed `gemini/gemini-3.5-flash`** (the CrewAI agent's LLM) is still a current,
   supported Gemini Flash model — no change needed.
+
+</details>
 
 ## License
 
