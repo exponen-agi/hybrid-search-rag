@@ -1,13 +1,13 @@
 # Pinned dependencies for the Hybrid Search RAG notebook.
 # Install with: pip install -r requirements.txt
 #
-# Checked against upstream release feeds on 2026-08-27; see README.md
+# Checked against upstream release feeds on 2026-09-03; see README.md
 # "Recent dependency & methodology updates" for what changed and why.
-crewai==1.15.17
-crewai-tools==1.15.17
+crewai==1.15.18
+crewai-tools==1.15.18
 qdrant-client==1.19.0
-langchain-google-genai==4.3.6
+langchain-google-genai==4.4.0
 psycopg2-binary==2.9.12
 scikit-learn==1.9.0
 numpy>=1.26
-faker==40.37.0
+faker==40.38.0
