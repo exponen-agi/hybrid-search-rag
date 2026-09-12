@@ -163,10 +163,35 @@ mock data.
 4. **Hybrid search** — `hybrid_search()` is the core function: it embeds the query two ways, then asks Qdrant to fuse the results with RRF.
 5. **CrewAI agent** — `build_recipe_crew()` wires up a single agent whose only tool is `hybrid_search()`, so it always answers based on real search results.
 
-## Recent dependency & methodology updates (checked 2026-09-03)
+## Recent dependency & methodology updates (checked 2026-09-10)
 
 This project is checked periodically against upstream release notes so it keeps working and
 keeps teaching current best practice, not outdated patterns. Latest pass:
+
+- **Bumped `crewai` and `crewai-tools` (1.15.18 → 1.15.21) and `psycopg2-binary`
+  (2.9.12 → 2.9.13)** to their latest published releases, verified directly against the
+  PyPI release feeds and each project's changelog. All are patch-level bug-fix releases
+  (crewai/crewai-tools: checkpoint-encoding, streaming tool-call, and Ollama URL fixes;
+  psycopg2: malformed `bytea`/array-parsing fixes) with no breaking changes to the
+  `Agent`/`Task`/`Crew`/`Process`/`LLM`/`BaseTool` APIs or `psycopg2.connect()` used in
+  this notebook. `qdrant-client`, `langchain-google-genai`, `scikit-learn`, `faker`, and
+  `numpy` had no new releases since the previous pass, so they stay as-is.
+- **Re-confirmed `gemini-embedding-2`** is still Google's current, generally-available
+  embedding model (now natively multimodal, topping the MTEB English leaderboard) at its
+  default 3072-dimension output (matching `EMBEDDING_DIM` in the notebook) — no code
+  changes needed.
+- **Re-confirmed `gemini/gemini-3.5-flash`** (the CrewAI agent's LLM) is still current and
+  supported, with no newer Gemini Flash release announced yet — no change needed.
+- **Noted for the curious:** Qdrant's docs now highlight **miniCOIL**
+  (`Qdrant/minicoil-v1`, via [FastEmbed](https://qdrant.tech/documentation/fastembed/))
+  as a newer alternative to plain TF-IDF/BM25 for the sparse/keyword side of hybrid
+  search — it adds light contextual awareness per term while staying keyword-exact. This
+  notebook keeps `TfidfVectorizer` because it needs zero extra downloads and is easiest to
+  read for a first hybrid-search example, but miniCOIL is worth trying if you fork this
+  notebook and want stronger keyword-side relevance.
+
+<details>
+<summary>Previous pass (2026-09-03)</summary>
 
 - **Bumped `crewai` and `crewai-tools` (1.15.17 → 1.15.18), `langchain-google-genai`
   (4.3.6 → 4.4.0), and `faker` (40.37.0 → 40.38.0)** to their latest published releases.
@@ -185,6 +210,8 @@ keeps teaching current best practice, not outdated patterns. Latest pass:
   (rank-based) fusion this notebook uses. RRF stays the better teaching default because it
   needs no score-normalization assumptions, but DBSF is worth trying if you fork this
   notebook and want to compare fusion strategies on your own data.
+
+</details>
 
 <details>
 <summary>Previous pass (2026-08-27)</summary>
