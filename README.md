@@ -1,5 +1,7 @@
 # Hybrid Search RAG: Recipe Recommender
 
+[![Test notebook (offline TEST_MODE)](https://github.com/exponen-agi/hybrid-search-rag/actions/workflows/test-notebook.yml/badge.svg)](https://github.com/exponen-agi/hybrid-search-rag/actions/workflows/test-notebook.yml)
+
 A small, easy-to-read example that shows how to combine **two kinds of search** into one
 better search, then use an AI agent to turn the results into a friendly answer.
 
@@ -71,6 +73,7 @@ If diagrams don't render for you, here is the same flow in plain text:
 | [`RAG_+_Hybrid_Search_with_Crew_AI,_NeonDb,_Qdrant_and_Gemini_a_real_world_scenario.ipynb`](<RAG_+_Hybrid_Search_with_Crew_AI,_NeonDb,_Qdrant_and_Gemini_a_real_world_scenario.ipynb>) | The full, runnable example notebook |
 | [`requirements.txt`](requirements.txt) | Exact, pinned package versions the notebook was tested with |
 | [`docs/index.html`](docs/index.html) | A visual, diagram-heavy explanation of the architecture |
+| [`.github/workflows/test-notebook.yml`](.github/workflows/test-notebook.yml) | CI that runs the notebook end-to-end in `TEST_MODE` on every push/PR, so a broken change is caught automatically |
 | [`LICENSE`](LICENSE) | MIT License |
 
 ## The tools this project uses
@@ -163,10 +166,45 @@ mock data.
 4. **Hybrid search** — `hybrid_search()` is the core function: it embeds the query two ways, then asks Qdrant to fuse the results with RRF.
 5. **CrewAI agent** — `build_recipe_crew()` wires up a single agent whose only tool is `hybrid_search()`, so it always answers based on real search results.
 
-## Recent dependency & methodology updates (checked 2026-09-10)
+## Recent dependency & methodology updates (checked 2026-09-17)
 
 This project is checked periodically against upstream release notes so it keeps working and
 keeps teaching current best practice, not outdated patterns. Latest pass:
+
+- **Bumped `crewai` and `crewai-tools` (1.15.21 → 1.15.22), `qdrant-client`
+  (1.19.0 → 1.19.1), `scikit-learn` (1.9.0 → 1.9.1), and `faker` (40.38.0 → 40.39.0)** to
+  their latest published releases, verified directly against the PyPI JSON release feeds
+  and each project's changelog. All are maintenance releases with no breaking changes to
+  the APIs this notebook uses: crewai/crewai-tools added features and fixed streaming/TUI
+  bugs without touching the `Agent`/`Task`/`Crew`/`Process`/`LLM`/`BaseTool` interfaces;
+  qdrant-client 1.19.1 only tightened local-mode (`:memory:`) behavior to match server
+  semantics (stricter `score_threshold`, rejecting empty vectors) — this notebook already
+  sends well-formed, non-empty vectors, so nothing changes for it; scikit-learn 1.9.1 is a
+  pure bug-fix release; faker 40.39.0 only fixes an unrelated `no_NO` IBAN checksum.
+  `langchain-google-genai`, `psycopg2-binary`, and `numpy` had no new releases since the
+  previous pass, so they stay as-is.
+- **Fixed a stale prerequisite:** the notebook listed "Python 3.9+", but `scikit-learn`
+  1.9.x (already pinned since the previous pass) actually requires Python **3.11+** — the
+  real floor across all pinned packages. Updated the prerequisite so newcomers don't hit a
+  confusing install failure on Python 3.9/3.10.
+- **Added CI** ([`.github/workflows/test-notebook.yml`](.github/workflows/test-notebook.yml))
+  that installs `requirements.txt` and executes the whole notebook with `nbconvert` on
+  Python 3.11/3.12/3.13, on every push and pull request. Because `TEST_MODE = True` by
+  default, this needs no API keys or cloud accounts, and the notebook's own `assert`
+  checks make the workflow fail if hybrid search ever breaks — verified locally before
+  this change was pushed.
+- **Re-confirmed `gemini-embedding-2`** is still Google's current, generally-available
+  embedding model at its default 3072-dimension output (matching `EMBEDDING_DIM` in the
+  notebook) — no code changes needed.
+- **Re-confirmed `gemini/gemini-3.5-flash`** (the CrewAI agent's LLM) has no deprecation or
+  shutdown date. Google has since shipped newer Flash-tier releases (3.6, 3.7, and 3.8
+  Flash, the latest as of September 2, 2026), but none of them replace or retire
+  `gemini-3.5-flash` — it stays a fully supported, stable choice for this teaching example.
+  If you fork this notebook and want the latest quality/speed trade-offs, trying
+  `gemini/gemini-3.8-flash` is a one-line change in the config cell.
+
+<details>
+<summary>Previous pass (2026-09-10)</summary>
 
 - **Bumped `crewai` and `crewai-tools` (1.15.18 → 1.15.21) and `psycopg2-binary`
   (2.9.12 → 2.9.13)** to their latest published releases, verified directly against the
@@ -189,6 +227,8 @@ keeps teaching current best practice, not outdated patterns. Latest pass:
   notebook keeps `TfidfVectorizer` because it needs zero extra downloads and is easiest to
   read for a first hybrid-search example, but miniCOIL is worth trying if you fork this
   notebook and want stronger keyword-side relevance.
+
+</details>
 
 <details>
 <summary>Previous pass (2026-09-03)</summary>
