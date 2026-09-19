@@ -1,0 +1,45 @@
+name: Test notebook (offline TEST_MODE)
+
+# Runs the notebook end-to-end in TEST_MODE (the default), which needs no API
+# keys, no Postgres, and no Qdrant Cloud account. If hybrid search breaks,
+# the notebook's own `assert` checks make this workflow fail.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  run-notebook:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the minimum required by scikit-learn 1.9.x (see requirements.txt).
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install jupyter nbconvert ipykernel
+          python -m ipykernel install --user --name python3 --display-name "Python 3"
+
+      - name: Execute notebook in TEST_MODE
+        run: |
+          jupyter nbconvert --to notebook --execute \
+            --ExecutePreprocessor.kernel_name=python3 \
+            --ExecutePreprocessor.timeout=300 \
+            --output-dir=/tmp --output=executed_notebook.ipynb \
+            "RAG_+_Hybrid_Search_with_Crew_AI,_NeonDb,_Qdrant_and_Gemini_a_real_world_scenario.ipynb"
+
+      - name: Show executed notebook output on failure
+        if: failure()
+        run: |
+          jupyter nbconvert --to script --stdout /tmp/executed_notebook.ipynb || true
